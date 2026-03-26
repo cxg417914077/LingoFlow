@@ -1,0 +1,202 @@
+openapi: 3.0.0
+info:
+  title: LingoFlow API
+  description: API for the LingoFlow immersive English learning platform.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: Main API server
+paths:
+  /auth/login:
+    post:
+      summary: User login
+      description: Authenticates a user and returns a token. Enforces single-point login.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+
+  /admin/videos:
+    post:
+      summary: Upload a new video
+      description: Uploads a video file and returns a video ID and playback URL.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Video uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  videoId:
+                    type: string
+                  url:
+                    type: string
+        '403':
+          description: Forbidden (Not an admin)
+
+  /admin/subtitles:
+    post:
+      summary: Upload subtitles for a video
+      description: Uploads an SRT/VTT file, processes it, and associates it with a video.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                videoId:
+                  type: string
+                file:
+                  type: string
+                  format: binary
+                language:
+                  type: string
+                  enum: [en, zh]
+      responses:
+        '201':
+          description: Subtitles processed and uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subtitleId:
+                    type: string
+                  processedData:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SubtitleSegment'
+
+  /videos/{videoId}:
+    get:
+      summary: Get video details
+      description: Retrieves video metadata, playback URL, and structured subtitle data.
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Video details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoData'
+        '404':
+          description: Video not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [student, admin]
+    VocabItem:
+      type: object
+      properties:
+        word:
+          type: string
+        level:
+          type: string
+          enum: [junior, high, cet46, abroad]
+        translation:
+          type: string
+        example:
+          type: string
+    SubtitleSegment:
+      type: object
+      properties:
+        id:
+          type: string
+        startTime:
+          type: number
+          format: float
+          description: Start time in seconds
+        endTime:
+          type: number
+          format: float
+          description: End time in seconds
+        en:
+          type: string
+        zh:
+          type: string
+        vocab:
+          type: array
+          items:
+            $ref: '#/components/schemas/VocabItem'
+    VideoData:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+        subtitles:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubtitleSegment'
